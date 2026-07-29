@@ -2,17 +2,20 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
+const isVercel = process.env.VERCEL === '1';
 const dataDir = path.join(__dirname, '../data');
-if (!fs.existsSync(dataDir)) {
+
+// On Vercel (read-only filesystem), use in-memory database. Locally, use disk.
+const dbPath = isVercel ? ':memory:' : path.join(dataDir, 'gulch_core.db');
+
+if (!isVercel && !fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dbPath = path.join(dataDir, 'gulch_core.db');
 const db = new DatabaseSync(dbPath);
+console.log(`Connected to Gulch SQLite Core (${isVercel ? 'Vercel In-Memory' : 'Local Disk'}).`);
 
-console.log('Connected to Gulch Native SQLite Core.');
-
-// Master Table Schema (Includes All Columns)
+// Initialize Schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS subjects (
     id TEXT PRIMARY KEY,
@@ -39,7 +42,7 @@ db.exec(`
   );
 `);
 
-// Safe Migrations for existing DB files
+// Safe Migrations
 try { db.exec("ALTER TABLE tasks ADD COLUMN priority TEXT DEFAULT 'HIGH'"); } catch (e) {}
 try { db.exec("ALTER TABLE subjects ADD COLUMN type TEXT DEFAULT 'UNIVERSITY'"); } catch (e) {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN scheduledDay INTEGER"); } catch (e) {}
@@ -52,11 +55,8 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN assetPath TEXT DEFAULT ''"); } catch
 const countResult = db.prepare("SELECT COUNT(*) AS count FROM subjects").get();
 
 if (countResult.count === 0) {
-  console.log('Seeding initial Subjects into SQLite...');
   const insert = db.prepare("INSERT INTO subjects (id, name, category, type, status) VALUES (?, ?, ?, ?, ?)");
-  
   const initialSubjects = [
-    // UNIVERSITY
     ['bsmath111', 'College Algebra', 'Major', 'UNIVERSITY', 'green'],
     ['bsmath112', 'Fundamentals of Computing 1', 'Major', 'UNIVERSITY', 'green'],
     ['ge4', 'Math in the Modern World', 'GE', 'UNIVERSITY', 'green'],
@@ -65,13 +65,10 @@ if (countResult.count === 0) {
     ['ge2', 'Readings in Phil History', 'GE', 'UNIVERSITY', 'green'],
     ['pathfit1', 'PATHFIT 1', 'GE', 'UNIVERSITY', 'green'],
     ['nstp1', 'ROTC (NSTP 1)', 'GE', 'UNIVERSITY', 'green'],
-    
-    // SOVEREIGN
     ['euclid', "Euclid's Elements", 'Classical', 'SOVEREIGN', 'green'],
     ['gulch_dev', 'Gulch OS Development', 'Systems', 'SOVEREIGN', 'green'],
     ['atrophia', 'Atrophia Substack', 'Writing', 'SOVEREIGN', 'green']
   ];
-
   initialSubjects.forEach(sub => insert.run(...sub));
 }
 
@@ -89,9 +86,6 @@ module.exports = {
       const stmt = db.prepare(sql);
       const info = stmt.run(...cleanParams);
       callback.call(info, null);
-    } catch (err) {
-      console.error('SQLite Error:', err.message);
-      callback(err);
-    }
+    } catch (err) { callback(err); }
   }
 };
