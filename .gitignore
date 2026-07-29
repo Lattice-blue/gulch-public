@@ -1,0 +1,6 @@
+# OPERATIONAL SECURITY (Never upload to GitHub or Cloud)
+data/strategy/
+data/journal/
+data/gulch_core.db
+node_modules/
+client/dist/

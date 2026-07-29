@@ -1,0 +1,75 @@
+/* MARKDOWN DOCUMENT TYPOGRAPHY */
+.gulch-markdown-body {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  line-height: 1.8;
+  letter-spacing: 0.03em;
+}
+.gulch-markdown-body h1 {
+  font-size: 16px;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.gulch-markdown-body h2 {
+  font-size: 13px;
+  color: #00f0ff; /* Cyan section titles */
+  margin-top: 24px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px dashed rgba(0, 240, 255, 0.2);
+  padding-bottom: 4px;
+}
+.gulch-markdown-body h3 {
+  font-size: 12px;
+  color: #ffaa00; /* Amber sub-headers */
+  margin-top: 18px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.gulch-markdown-body ul, .gulch-markdown-body ol {
+  padding-left: 20px;
+  margin-bottom: 16px;
+}
+.gulch-markdown-body li {
+  margin-bottom: 6px;
+}
+.gulch-markdown-body p {
+  margin-bottom: 14px;
+}
+.gulch-markdown-body code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #39ff14;
+  padding: 2px 6px;
+  font-size: 11px;
+  border-radius: 2px;
+}
+.gulch-markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 11px;
+}
+.gulch-markdown-body th, .gulch-markdown-body td {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 12px;
+  text-align: left;
+}
+.gulch-markdown-body th {
+  background: rgba(255, 255, 255, 0.05);
+  color: #00f0ff;
+}
+.gulch-markdown-body blockquote {
+  border-left: 2px solid #39ff14;
+  padding-left: 14px;
+  margin: 16px 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  background: rgba(57, 255, 20, 0.03);
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
