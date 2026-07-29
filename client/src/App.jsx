@@ -6,11 +6,219 @@ import CalendarGrid from './CalendarGrid';
 import TacticalHUD from './components/TacticalHUD';
 import HorizonCountdown from './components/HorizonCountdown';
 import TimeRatioGauge from './components/TimeRatioGauge';
-import HorizonView from './components/HorizonView';
 import TacticalStopwatch from './components/TacticalStopwatch';
-import TaskInspectView from './components/TaskInspectView';
 
 import './App.css';
+
+// DYNAMIC API BASE (Works both locally on port 5173 and online on Vercel)
+const API_BASE = typeof window !== 'undefined' && window.location.origin.includes('5173') 
+  ? 'http://localhost:3000' 
+  : '';
+
+// DEFAULT SUBJECTS FALLBACK (Guarantees buttons are NEVER missing)
+const DEFAULT_SUBJECTS = [
+  { id: 'bsmath111', name: 'College Algebra', category: 'Major', type: 'UNIVERSITY', status: 'green' },
+  { id: 'bsmath112', name: 'Fundamentals of Computing 1', category: 'Major', type: 'UNIVERSITY', status: 'green' },
+  { id: 'ge4', name: 'Math in the Modern World', category: 'GE', type: 'UNIVERSITY', status: 'green' },
+  { id: 'ge1', name: 'Understanding the Self', category: 'GE', type: 'UNIVERSITY', status: 'green' },
+  { id: 'ge3', name: 'Contemporary World', category: 'GE', type: 'UNIVERSITY', status: 'green' },
+  { id: 'ge2', name: 'Readings in Phil History', category: 'GE', type: 'UNIVERSITY', status: 'green' },
+  { id: 'pathfit1', name: 'PATHFIT 1', category: 'GE', type: 'UNIVERSITY', status: 'green' },
+  { id: 'nstp1', name: 'ROTC (NSTP 1)', category: 'GE', type: 'UNIVERSITY', status: 'green' },
+  { id: 'euclid', name: "Euclid's Elements", category: 'Classical', type: 'SOVEREIGN', status: 'green' },
+  { id: 'gulch_dev', name: 'Gulch OS Development', category: 'Systems', type: 'SOVEREIGN', status: 'green' },
+  { id: 'atrophia', name: 'Atrophia Substack', category: 'Writing', type: 'SOVEREIGN', status: 'green' }
+];
+
+// 1. HORIZON VIEW COMPONENT
+function HorizonView() {
+  const [horizonDocs, setHorizonDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch(`${API_BASE}/api/docs/strategy`)
+      .then(res => res.json())
+      .then(async (docsData) => {
+        if (!Array.isArray(docsData) || docsData.length === 0) {
+          if (isMounted) setLoading(false);
+          return;
+        }
+        const fullDocs = await Promise.all(
+          docsData.map(async (doc) => {
+            const res = await fetch(`${API_BASE}/api/data/strategy/${doc.slug}`);
+            const data = await res.json();
+            return { ...doc, html: data.html };
+          })
+        );
+        if (isMounted) {
+          setHorizonDocs(fullDocs);
+          setLoading(false);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load horizon docs:', err);
+        if (isMounted) setLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ color: 'rgba(255,255,255,0.3)', padding: '50px', textAlign: 'center', fontSize: '11px', letterSpacing: '0.15em' }}>
+        &gt; LOADING STRATEGIC ARCHITECTURE...
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '30px 20px 60px 20px' }}>
+      <div style={{ maxWidth: '850px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '30px' }}>
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <h2 style={{ fontSize: '14px', letterSpacing: '0.2em', color: '#fff', textTransform: 'uppercase' }}>
+            // STRATEGIC HORIZON ARCHITECTURE
+          </h2>
+          <span style={{ fontSize: '9px', color: 'rgba(0, 240, 255, 0.6)', letterSpacing: '0.15em' }}>
+            CONFIDENTIAL // SOVEREIGN DIRECTIVES
+          </span>
+        </div>
+
+        {horizonDocs.length === 0 ? (
+          <div style={{ background: 'rgba(0, 0, 0, 0.75)', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '11px', letterSpacing: '0.15em' }}>
+            [ DEMO ENVIRONMENT // ACCESS RESTRICTED ] <br />
+            <span style={{ fontSize: '9px', opacity: 0.6, marginTop: '8px', display: 'block' }}>
+              Strategic horizon directives are localized to primary node hardware.
+            </span>
+          </div>
+        ) : (
+          horizonDocs.map((doc) => (
+            <div 
+              key={doc.slug} 
+              style={{
+                background: 'rgba(0, 0, 0, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(12px)',
+                padding: '30px',
+                borderRadius: '2px',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)'
+              }}
+            >
+              <div className="gulch-markdown-body" dangerouslySetInnerHTML={{ __html: doc.html }} />
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 2. TASK INSPECTION VIEW COMPONENT
+function TaskInspectView({ task, subject, onBack, onUpdateTask }) {
+  const [description, setDescription] = useState(task.description || '');
+  const [assetPath, setAssetPath] = useState(task.assetPath || '');
+  const [isSaved, setIsSaved] = useState(false);
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    onUpdateTask(task.id, { description, assetPath });
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  const cleanAssetPath = assetPath.replace(/^\/home\/zmarttrc\/Documents\//, '').replace(/^\//, '');
+  const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(cleanAssetPath);
+
+  return (
+    <div style={{ flex: 1, padding: '30px', display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto', fontFamily: "'JetBrains Mono', monospace" }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.15)', paddingBottom: '15px' }}>
+        <button 
+          onClick={onBack}
+          style={{ background: 'rgba(0, 240, 255, 0.15)', border: '1px solid #00f0ff', color: '#00f0ff', padding: '6px 14px', fontSize: '10px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.15em' }}
+        >
+          ◄ BACK TO OPERATIONAL SCHEDULE
+        </button>
+        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.15em' }}>
+          TASK_ID: {task.id}
+        </span>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div style={{ fontSize: '9px', color: 'rgba(0, 240, 255, 0.6)', letterSpacing: '0.15em', marginBottom: '6px' }}>
+            [ SUBJECT: {subject ? subject.name : task.subjectId} | {task.category} ]
+          </div>
+          <h2 style={{ fontSize: '18px', color: '#fff', textTransform: 'uppercase' }}>
+            {task.title}
+          </h2>
+          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', display: 'flex', gap: '15px' }}>
+            <span>DUE: <strong style={{ color: '#ffaa00' }}>{task.deadline}</strong></span>
+            <span>PRIORITY: <strong style={{ color: task.priority === 'HIGH' ? '#ff4d4d' : '#ffaa00' }}>{task.priority}</strong></span>
+            <span>STATUS: <strong style={{ color: task.status === 'Completed' ? '#39ff14' : '#00f0ff' }}>{task.status}</strong></span>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleSave}
+          style={{ background: isSaved ? '#39ff14' : '#00f0ff', color: '#000', border: 'none', padding: '10px 20px', fontWeight: 'bold', fontSize: '11px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.1em' }}
+        >
+          {isSaved ? '✓ SAVED' : 'SAVE DETAILS'}
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '20px', flex: 1 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '20px' }}>
+          <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.15em' }}>
+            &gt; INSTRUCTIONS &amp; OPERATIONAL NOTES
+          </label>
+          <textarea 
+            placeholder="Type assignment details, syllabus notes, or instructions here..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            style={{ flex: 1, minHeight: '200px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#fff', padding: '12px', fontFamily: 'inherit', fontSize: '11px', lineHeight: '1.6', outline: 'none', resize: 'vertical' }}
+          />
+        </div>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '20px' }}>
+          <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', letterSpacing: '0.15em' }}>
+            &gt; ATTACHED LOCAL ASSET PATH (/home/zmarttrc/Documents/...)
+          </label>
+          <input 
+            type="text" 
+            placeholder="e.g. bsmath111/module_1_screenshot.png"
+            value={assetPath}
+            onChange={(e) => setAssetPath(e.target.value)}
+            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#00f0ff', padding: '8px 12px', fontFamily: 'inherit', fontSize: '11px', outline: 'none' }}
+          />
+          <div style={{ flex: 1, border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '10px', background: 'rgba(0,0,0,0.4)' }}>
+            {cleanAssetPath ? (
+              isImage ? (
+                <img 
+                  src={`${API_BASE}/api/assets/${cleanAssetPath}`} 
+                  alt="Assignment Attachment" 
+                  style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain', border: '1px solid rgba(255,255,255,0.2)' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <div style={{ fontSize: '11px', color: '#00f0ff', textAlign: 'center' }}>
+                  📄 FILE ATTACHED: <br />
+                  <a href={`${API_BASE}/api/assets/${cleanAssetPath}`} target="_blank" rel="noreferrer" style={{ color: '#00f0ff', textDecoration: 'underline', marginTop: '8px', display: 'inline-block' }}>
+                    Open /home/zmarttrc/Documents/{cleanAssetPath}
+                  </a>
+                </div>
+              )
+            ) : (
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>
+                [ NO LOCAL FILE ATTACHED ] <br />
+                <span style={{ fontSize: '9px', opacity: 0.7 }}>Drop a screenshot into /home/zmarttrc/Documents/ and paste path above</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [activeScreen, setActiveScreen] = useState('OVERVIEW');
@@ -19,7 +227,7 @@ function App() {
   const [subjectScope, setSubjectScope] = useState('UNIVERSITY');
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
 
-  // ROOT-LEVEL PERSISTENT STOPWATCH STATE
+  // ROOT-LEVEL STOPWATCH STATE
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
   const [isStopwatchActive, setIsStopwatchActive] = useState(false);
 
@@ -43,7 +251,6 @@ function App() {
 
   const overlayOpacity = activeScreen === 'OVERVIEW' ? 0.35 : 0.85;
 
-  // 1. ROOT PERSISTENT TIMER TICK
   useEffect(() => {
     let interval = null;
     if (isStopwatchActive) {
@@ -56,18 +263,13 @@ function App() {
     return () => clearInterval(interval);
   }, [isStopwatchActive]);
 
-  // 2. GLOBAL DYNAMIC BROWSER TAB TITLE UPDATER
   useEffect(() => {
     if (isStopwatchActive) {
       const h = Math.floor(stopwatchSeconds / 3600);
       const m = Math.floor((stopwatchSeconds % 3600) / 60);
       const s = stopwatchSeconds % 60;
       const pad = (n) => String(n).padStart(2, '0');
-      
-      const formatted = h > 0 
-        ? `${pad(h)}:${pad(m)}:${pad(s)}` 
-        : `${pad(m)}:${pad(s)}`;
-      
+      const formatted = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
       document.title = `⏱️ ${formatted} | GULCH`;
     } else {
       document.title = 'GULCH // OPERATING PICTURE';
@@ -76,14 +278,22 @@ function App() {
 
   // Fetch SQLite data
   useEffect(() => {
-    fetch('http://localhost:3000/api/subjects')
+    fetch(`${API_BASE}/api/subjects`)
       .then(res => res.json())
-      .then(data => setSubjects(data))
-      .catch(err => console.error(err));
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setSubjects(data);
+        } else {
+          setSubjects(DEFAULT_SUBJECTS); // Fallback
+        }
+      })
+      .catch(() => setSubjects(DEFAULT_SUBJECTS));
 
-    fetch('http://localhost:3000/api/tasks')
+    fetch(`${API_BASE}/api/tasks`)
       .then(res => res.json())
-      .then(data => setTasks(data))
+      .then(data => {
+        if (Array.isArray(data)) setTasks(data);
+      })
       .catch(err => console.error(err));
   }, []);
 
@@ -108,7 +318,7 @@ function App() {
       status: 'Unassigned'
     };
 
-    fetch('http://localhost:3000/api/tasks', {
+    fetch(`${API_BASE}/api/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newTask)
@@ -126,7 +336,7 @@ function App() {
 
   const handleToggleTask = (task) => {
     const newStatus = task.status === 'Completed' ? 'Unassigned' : 'Completed';
-    fetch(`http://localhost:3000/api/tasks/${task.id}`, {
+    fetch(`${API_BASE}/api/tasks/${task.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus })
@@ -139,7 +349,7 @@ function App() {
   };
 
   const handleDeleteTask = (taskId) => {
-    fetch(`http://localhost:3000/api/tasks/${taskId}`, { method: 'DELETE' })
+    fetch(`${API_BASE}/api/tasks/${taskId}`, { method: 'DELETE' })
       .then(res => res.json())
       .then(() => {
         setTasks(prev => prev.filter(t => t.id !== taskId));
@@ -149,7 +359,7 @@ function App() {
 
   const handleScheduleTask = (taskId, e) => {
     e.preventDefault();
-    fetch(`http://localhost:3000/api/tasks/${taskId}`, {
+    fetch(`${API_BASE}/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -174,7 +384,7 @@ function App() {
   };
 
   const handleUpdateTaskDetails = (taskId, { description, assetPath }) => {
-    fetch(`http://localhost:3000/api/tasks/${taskId}`, {
+    fetch(`${API_BASE}/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description, assetPath })
@@ -200,7 +410,7 @@ function App() {
       type: 'SOVEREIGN'
     };
 
-    fetch('http://localhost:3000/api/subjects', {
+    fetch(`${API_BASE}/api/subjects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSubj)
@@ -217,7 +427,7 @@ function App() {
   const handleDeleteSubject = (subjectId) => {
     if (!window.confirm('Delete this sovereign subject and all associated tasks?')) return;
 
-    fetch(`http://localhost:3000/api/subjects/${subjectId}`, { method: 'DELETE' })
+    fetch(`${API_BASE}/api/subjects/${subjectId}`, { method: 'DELETE' })
       .then(res => res.json())
       .then(() => {
         setSubjects(prev => prev.filter(s => s.id !== subjectId));
@@ -227,7 +437,8 @@ function App() {
       .catch(err => console.error(err));
   };
 
-  const visibleSubjects = subjects.filter(s => (s.type || 'UNIVERSITY') === subjectScope);
+  const activeSubjectsList = subjects.length > 0 ? subjects : DEFAULT_SUBJECTS;
+  const visibleSubjects = activeSubjectsList.filter(s => (s.type || 'UNIVERSITY') === subjectScope);
   const currentSubjectTasks = selectedSubject ? tasks.filter(t => t.subjectId === selectedSubject.id) : [];
   const isSovereign = subjectScope === 'SOVEREIGN';
 
@@ -256,18 +467,7 @@ function App() {
               </div>
             </div>
 
-            {/* RIGHT SIDE TACTICAL HUD STACK */}
-            <div style={{ 
-              position: 'absolute', 
-              right: '25px', 
-              top: '50%', 
-              transform: 'translateY(-50%)', 
-              zIndex: 4, 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '12px', 
-              width: '310px' 
-            }}>
+            <div style={{ position: 'absolute', right: '25px', top: '50%', transform: 'translateY(-50%)', zIndex: 4, display: 'flex', flexDirection: 'column', gap: '12px', width: '310px' }}>
               <TacticalStopwatch 
                 seconds={stopwatchSeconds} 
                 isActive={isStopwatchActive} 
@@ -411,6 +611,7 @@ function App() {
                                     <div onClick={() => handleToggleTask(task)} style={{ color: task.status === 'Completed' ? '#39ff14' : 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '12px', marginTop: '2px' }}>
                                       {task.status === 'Completed' ? '[X]' : '[ ]'}
                                     </div>
+
                                     <div style={{ flex: 1 }}>
                                       <div onClick={() => setInspectedTask(task)} style={{ fontSize: '12px', color: task.status === 'Completed' ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: task.status === 'Completed' ? 'line-through' : 'none', cursor: 'pointer' }} title="Click to inspect task details & attachments">
                                         &gt; {task.title}
@@ -426,9 +627,11 @@ function App() {
                                         <span style={{ color: task.status === 'Scheduled' ? '#00f0ff' : 'inherit' }}>STATUS: {task.status}</span>
                                       </div>
                                     </div>
+
                                     <button onClick={() => setSchedulingTaskId(schedulingTaskId === task.id ? null : task.id)} style={{ background: 'rgba(0, 240, 255, 0.1)', border: '1px solid rgba(0, 240, 255, 0.3)', color: '#00f0ff', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px', padding: '2px 6px' }}>
                                       {schedulingTaskId === task.id ? 'CANCEL' : 'SCHED'}
                                     </button>
+
                                     <button onClick={() => handleDeleteTask(task.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,50,50,0.5)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '10px' }}>
                                       DEL
                                     </button>
