@@ -174,7 +174,12 @@ if (fs.existsSync(clientDistPath)) {
     }
   });
 }
+// Export app for Vercel serverless invocation
+module.exports = app;
 
-app.listen(PORT, () => {
-  console.log(`Gulch server running on http://localhost:${PORT}`);
-});
+// Only start independent server listener if NOT on Vercel
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Gulch server running on http://localhost:${PORT}`);
+  });
+}
