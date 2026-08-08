@@ -1,7 +1,7 @@
 export default function NavBar({ activeScreen, onScreenChange }) {
   return (
     <div className="navbar">
-      {/* 1. THE NEW OVERVIEW BUTTON */}
+      {/* 1. OVERVIEW */}
       <button 
         className={`nav-btn ${activeScreen === 'OVERVIEW' ? 'active' : ''}`}
         onClick={() => onScreenChange('OVERVIEW')}
@@ -17,7 +17,15 @@ export default function NavBar({ activeScreen, onScreenChange }) {
         OPERATIONAL SCHEDULE
       </button>
 
-      {/* 3. HORIZON GOALS */}
+      {/* 3. TASK ARCHIVES (NEW) */}
+      <button 
+        className={`nav-btn ${activeScreen === 'ARCHIVES' ? 'active' : ''}`}
+        onClick={() => onScreenChange('ARCHIVES')}
+      >
+        TASK ARCHIVES
+      </button>
+
+      {/* 4. HORIZON GOALS */}
       <button 
         className={`nav-btn ${activeScreen === 'HORIZON' ? 'active' : ''}`}
         onClick={() => onScreenChange('HORIZON')}

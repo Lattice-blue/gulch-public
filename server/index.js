@@ -67,11 +67,27 @@ app.delete('/api/subjects/:id', (req, res) => {
   });
 });
 
-// 4. Get all tasks
+// 4. Get all tasks (Includes auto-sweep for overdue deadlines)
 app.get('/api/tasks', (req, res) => {
-  db.all("SELECT * FROM tasks", [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+  const today = getLocalDateString(new Date());
+
+  // Automatically transition uncompleted tasks past deadline to 'Failed'
+  const autoFailSql = `
+    UPDATE tasks 
+    SET status = 'Failed' 
+    WHERE deadline != 'NO DEADLINE' 
+      AND deadline < ? 
+      AND status NOT IN ('Completed', 'Failed')
+  `;
+
+  db.run(autoFailSql, [today], function(err) {
+    if (err) console.error('Auto-fail sweep error:', err);
+
+    // Return updated task list
+    db.all("SELECT * FROM tasks", [], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows);
+    });
   });
 });
 
@@ -96,14 +112,14 @@ app.post('/api/tasks', (req, res) => {
 });
 
 // 6. Update task details/status/schedule/assets
-// 6. Update task details/status/schedule/assets
 app.put('/api/tasks/:id', (req, res) => {
-  const { status, scheduledDay, startTime, endTime, description, assetPath } = req.body;
+  const { status, scheduledDay, scheduledDate, startTime, endTime, description, assetPath } = req.body;
 
   const sql = `
     UPDATE tasks 
     SET status = COALESCE(?, status),
         scheduledDay = COALESCE(?, scheduledDay),
+        scheduledDate = COALESCE(?, scheduledDate),
         startTime = COALESCE(?, startTime),
         endTime = COALESCE(?, endTime),
         description = COALESCE(?, description),
@@ -111,11 +127,20 @@ app.put('/api/tasks/:id', (req, res) => {
     WHERE id = ?
   `;
 
-  db.run(sql, [status, scheduledDay, startTime, endTime, description, assetPath, req.params.id], function(err) {
+  db.run(sql, [status, scheduledDay, scheduledDate, startTime, endTime, description, assetPath, req.params.id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ message: 'Task updated successfully' });
   });
 });
+// 7. Delete a single task from SQLite
+app.delete('/api/tasks/:id', (req, res) => {
+  const { id } = req.params;
+  db.run(`DELETE FROM tasks WHERE id = ?`, [id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ message: 'Task deleted successfully' });
+  });
+});
+
 // =========================================
 // LEGACY MARKDOWN READERS
 // =========================================

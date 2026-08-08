@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import NavBar from './NavBar';
-import GlobeBackground from './GlobeBackground';
-import CalendarGrid from './CalendarGrid';
+import CalendarGrid from './components/CalendarGrid';
+import DailyCockpitView from './components/DailyCockpitView';
 
 import TacticalHUD from './components/TacticalHUD';
 import HorizonCountdown from './components/HorizonCountdown';
 import TimeRatioGauge from './components/TimeRatioGauge';
 import TacticalStopwatch from './components/TacticalStopwatch';
+import TaskArchiveView from './components/TaskArchiveView';
 
 import './App.css';
 
@@ -246,6 +247,7 @@ function App() {
 
   const [schedulingTaskId, setSchedulingTaskId] = useState(null);
   const [schedDay, setSchedDay] = useState(0);
+  const [schedDate, setSchedDate] = useState(''); 
   const [schedStart, setSchedStart] = useState('06:00');
   const [schedEnd, setSchedEnd] = useState('08:00');
 
@@ -298,7 +300,11 @@ function App() {
   }, []);
 
   const getSubjectStatus = (subjectId) => {
-    const activeTasks = tasks.filter(t => t.subjectId === subjectId && t.status !== 'Completed');
+    const activeTasks = tasks.filter(t => 
+      t.subjectId === subjectId && 
+      t.status !== 'Completed' && 
+      t.status !== 'Failed'
+    );
     if (activeTasks.length === 0) return 'green';
     const hasHighPriority = activeTasks.some(t => t.priority === 'HIGH');
     return hasHighPriority ? 'red' : 'yellow';
@@ -357,14 +363,16 @@ function App() {
       .catch(err => console.error(err));
   };
 
-  const handleScheduleTask = (taskId, e) => {
+const handleScheduleTask = (taskId, e) => {
     e.preventDefault();
+    const finalDate = schedDate || task.deadline || getLocalDateString(new Date());
+
     fetch(`${API_BASE}/api/tasks/${taskId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         status: 'Scheduled',
-        scheduledDay: parseInt(schedDay),
+        scheduledDate: finalDate,
         startTime: schedStart,
         endTime: schedEnd
       })
@@ -374,7 +382,7 @@ function App() {
         setTasks(prev => prev.map(t => t.id === taskId ? {
           ...t,
           status: 'Scheduled',
-          scheduledDay: parseInt(schedDay),
+          scheduledDate: finalDate,
           startTime: schedStart,
           endTime: schedEnd
         } : t));
@@ -439,47 +447,51 @@ function App() {
 
   const activeSubjectsList = subjects.length > 0 ? subjects : DEFAULT_SUBJECTS;
   const visibleSubjects = activeSubjectsList.filter(s => (s.type || 'UNIVERSITY') === subjectScope);
-  const currentSubjectTasks = selectedSubject ? tasks.filter(t => t.subjectId === selectedSubject.id) : [];
+  // Filter out Completed and Failed tasks from the active Operations view
+const currentSubjectTasks = selectedSubject 
+  ? tasks.filter(t => t.subjectId === selectedSubject.id && t.status !== 'Completed' && t.status !== 'Failed') 
+  : [];
   const isSovereign = subjectScope === 'SOVEREIGN';
 
-  return (
-    <div style={{ backgroundImage: activeScreen !== 'OVERVIEW' ? 'url(/globe.jpg)' : 'none', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundColor: '#050505', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
-      
-      {activeScreen === 'OVERVIEW' && <GlobeBackground />}
-      
-      <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(5, 5, 5, ${overlayOpacity})`, zIndex: 1, pointerEvents: 'none', transition: 'background-color 0.8s ease' }} />
+return (
+  <div style={{ backgroundColor: '#050505', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
 
       <div style={{ position: 'relative', zIndex: 3, height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <NavBar activeScreen={activeScreen} onScreenChange={setActiveScreen} />
 
-        {/* SCREEN 1: OVERVIEW */}
+        {/* SCREEN 1: DAILY COCKPIT OVERVIEW */}
         {activeScreen === 'OVERVIEW' && (
-          <>
-            <TacticalHUD />
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 4 }}>
-              <div style={{ textAlign: 'center', letterSpacing: '0.2em', userSelect: 'none', filter: 'drop-shadow(0px 4px 16px rgba(0,0,0,0.95))' }}>
-                <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: '15px', fontWeight: '600', textTransform: 'uppercase', marginBottom: '12px' }}>
-                  "Be quick, be quiet, be on time."
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.25em' }}>
-                  — Clarence L. Johnson | Skunk Works
-                </div>
+          inspectedTask ? (
+            <TaskInspectView 
+              task={inspectedTask} 
+              subject={subjects.find(s => s.id === inspectedTask.subjectId)}
+              onBack={() => setInspectedTask(null)}
+              onUpdateTask={handleUpdateTaskDetails}
+            />
+          ) : (
+            <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              {/* Daily Flight Plan Main Section */}
+              <DailyCockpitView 
+                tasks={tasks}
+                subjects={subjects}
+                onToggleTask={handleToggleTask}
+                onInspectTask={setInspectedTask}
+              />
+
+              {/* Right Side Widgets: Stopwatch & Gauges */}
+              <div style={{ width: '310px', padding: '30px 25px 30px 0', zIndex: 4, display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
+                <TacticalStopwatch 
+                  seconds={stopwatchSeconds} 
+                  isActive={isStopwatchActive} 
+                  onToggle={() => setIsStopwatchActive(!isStopwatchActive)}
+                  onReset={() => { setIsStopwatchActive(false); setStopwatchSeconds(0); }}
+                />
+                <TimeRatioGauge tasks={tasks} subjects={subjects} />
+                <HorizonCountdown />
               </div>
             </div>
-
-            <div style={{ position: 'absolute', right: '25px', top: '50%', transform: 'translateY(-50%)', zIndex: 4, display: 'flex', flexDirection: 'column', gap: '12px', width: '310px' }}>
-              <TacticalStopwatch 
-                seconds={stopwatchSeconds} 
-                isActive={isStopwatchActive} 
-                onToggle={() => setIsStopwatchActive(!isStopwatchActive)}
-                onReset={() => { setIsStopwatchActive(false); setStopwatchSeconds(0); }}
-              />
-              <TimeRatioGauge tasks={tasks} subjects={subjects} />
-              <HorizonCountdown />
-            </div>
-          </>
+          )
         )}
-
         {/* SCREEN 2: OPERATIONAL SCHEDULE */}
         {activeScreen === 'OPERATIONS' && (
           inspectedTask ? (
@@ -490,7 +502,7 @@ function App() {
               onUpdateTask={handleUpdateTaskDetails}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <div style={{ display: 'flex', gap: '10px', padding: '12px 20px 0 20px', background: 'rgba(0,0,0,0.6)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <button 
                   onClick={() => { setSubjectScope('UNIVERSITY'); setSelectedSubject(null); }}
@@ -542,8 +554,8 @@ function App() {
                 </form>
               )}
 
-              <div style={{ display: 'flex', flex: 1, padding: '20px', gap: '20px', overflow: 'hidden' }}>
-                <div style={{ flex: isLeftPanelCollapsed ? '0 0 36px' : '0 0 440px', display: 'flex', flexDirection: 'column', border: isSovereign ? '1px solid rgba(0, 240, 255, 0.35)' : '1px solid rgba(255,255,255,0.1)', boxShadow: isSovereign ? '0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.05)' : 'none', background: 'rgba(0,0,0,0.75)', padding: isLeftPanelCollapsed ? '15px 5px' : '20px', backdropFilter: 'blur(10px)', overflowY: 'auto', overflowX: 'hidden', transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)', position: 'relative' }}>
+              <div style={{ display: 'flex', flex: 1, padding: '20px', gap: '20px', overflow: 'hidden', minHeight: 0 }}>
+                <div style={{ flex: isLeftPanelCollapsed ? '0 0 36px' : '0 0 440px', display: 'flex', flexDirection: 'column', maxHeight: '100%', border: isSovereign ? '1px solid rgba(0, 240, 255, 0.35)' : '1px solid rgba(255,255,255,0.1)', boxShadow: isSovereign ? '0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.05)' : 'none', background: 'rgba(0,0,0,0.75)', padding: isLeftPanelCollapsed ? '15px 5px' : '20px', backdropFilter: 'blur(10px)', overflowY: 'auto', overflowX: 'hidden', transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)', position: 'relative' }}>
                   {isLeftPanelCollapsed ? (
                     <div onClick={() => setIsLeftPanelCollapsed(false)} style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', color: isSovereign ? '#00f0ff' : '#39ff14', fontSize: '11px', letterSpacing: '0.2em', userSelect: 'none' }} title="Click to Expand Task Panel">
                       <div style={{ marginBottom: '25px', fontSize: '12px', fontWeight: 'bold' }}>►</div>
@@ -628,9 +640,23 @@ function App() {
                                       </div>
                                     </div>
 
-                                    <button onClick={() => setSchedulingTaskId(schedulingTaskId === task.id ? null : task.id)} style={{ background: 'rgba(0, 240, 255, 0.1)', border: '1px solid rgba(0, 240, 255, 0.3)', color: '#00f0ff', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px', padding: '2px 6px' }}>
-                                      {schedulingTaskId === task.id ? 'CANCEL' : 'SCHED'}
-                                    </button>
+                                    <button 
+  onClick={() => {
+    if (schedulingTaskId === task.id) {
+      setSchedulingTaskId(null);
+    } else {
+      setSchedulingTaskId(task.id);
+      // Pre-fill date with task deadline if available, otherwise today's date
+      const initialDate = (task.deadline && task.deadline !== 'NO DEADLINE') 
+        ? task.deadline 
+        : getLocalDateString(new Date());
+      setSchedDate(initialDate);
+    }
+  }} 
+  style={{ background: 'rgba(0, 240, 255, 0.1)', border: '1px solid rgba(0, 240, 255, 0.3)', color: '#00f0ff', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px', padding: '2px 6px' }}
+>
+  {schedulingTaskId === task.id ? 'CANCEL' : 'SCHED'}
+</button>
 
                                     <button onClick={() => handleDeleteTask(task.id)} style={{ background: 'none', border: 'none', color: 'rgba(255,50,50,0.5)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '10px' }}>
                                       DEL
@@ -638,24 +664,34 @@ function App() {
                                   </div>
 
                                   {schedulingTaskId === task.id && (
-                                    <form onSubmit={(e) => handleScheduleTask(task.id, e)} style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(255,255,255,0.1)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                      <select value={schedDay} onChange={e => setSchedDay(e.target.value)} style={{ background: '#111', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '9px', padding: '4px' }}>
-                                        <option value={0}>MON</option>
-                                        <option value={1}>TUE</option>
-                                        <option value={2}>WED</option>
-                                        <option value={3}>THU</option>
-                                        <option value={4}>FRI</option>
-                                        <option value={5}>SAT</option>
-                                        <option value={6}>SUN</option>
-                                      </select>
-                                      <input type="text" placeholder="06:00" value={schedStart} onChange={e => setSchedStart(e.target.value)} style={{ width: '50px', background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '9px', padding: '4px' }} />
-                                      <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', alignSelf: 'center' }}>to</span>
-                                      <input type="text" placeholder="09:00" value={schedEnd} onChange={e => setSchedEnd(e.target.value)} style={{ width: '50px', background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '9px', padding: '4px' }} />
-                                      <button type="submit" style={{ background: '#00f0ff', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '9px', padding: '4px 10px', cursor: 'pointer' }}>
-                                        SAVE
-                                      </button>
-                                    </form>
-                                  )}
+  <form onSubmit={(e) => handleScheduleTask(task.id, e)} style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(255,255,255,0.1)', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+    <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)' }}>DATE:</span>
+    <input 
+      type="date" 
+      value={schedDate} 
+      onChange={e => setSchedDate(e.target.value)} 
+      style={{ background: '#111', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '9px', padding: '4px', fontFamily: 'inherit' }} 
+    />
+    <input 
+      type="text" 
+      placeholder="06:00" 
+      value={schedStart} 
+      onChange={e => setSchedStart(e.target.value)} 
+      style={{ width: '50px', background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '9px', padding: '4px', fontFamily: 'inherit' }} 
+    />
+    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '9px' }}>to</span>
+    <input 
+      type="text" 
+      placeholder="09:00" 
+      value={schedEnd} 
+      onChange={e => setSchedEnd(e.target.value)} 
+      style={{ width: '50px', background: 'transparent', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: '9px', padding: '4px', fontFamily: 'inherit' }} 
+    />
+    <button type="submit" style={{ background: '#00f0ff', color: '#000', border: 'none', fontWeight: 'bold', fontSize: '9px', padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit' }}>
+      SAVE
+    </button>
+  </form>
+)}
                                 </div>
                               ))
                             )}
@@ -671,10 +707,30 @@ function App() {
                 </div>
 
                 <div style={{ flex: 1, border: isSovereign ? '1px solid rgba(0, 240, 255, 0.35)' : '1px solid rgba(255,255,255,0.1)', boxShadow: isSovereign ? '0 0 30px rgba(0, 240, 255, 0.15), inset 0 0 15px rgba(0, 240, 255, 0.05)' : 'none', background: 'rgba(0,0,0,0.5)', padding: '20px', backdropFilter: 'blur(10px)', transition: 'all 0.4s ease' }}>
-                  <CalendarGrid tasks={tasks} />
+                  <CalendarGrid tasks={tasks.filter(t => t.status !== 'Completed' && t.status !== 'Failed')} subjects={subjects} />
                 </div>
               </div>
             </div>
+          )
+        )}
+
+        {/* SCREEN 4: TASK ARCHIVES */}
+        {activeScreen === 'ARCHIVES' && (
+          inspectedTask ? (
+            <TaskInspectView 
+              task={inspectedTask} 
+              subject={subjects.find(s => s.id === inspectedTask.subjectId)}
+              onBack={() => setInspectedTask(null)}
+              onUpdateTask={handleUpdateTaskDetails}
+            />
+          ) : (
+            <TaskArchiveView 
+              tasks={tasks}
+              subjects={subjects}
+              onToggleTask={handleToggleTask}
+              onDeleteTask={handleDeleteTask}
+              onInspectTask={setInspectedTask}
+            />
           )
         )}
 

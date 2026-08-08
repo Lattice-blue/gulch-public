@@ -51,6 +51,22 @@ try { db.exec("ALTER TABLE tasks ADD COLUMN endTime TEXT"); } catch (e) {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN description TEXT DEFAULT ''"); } catch (e) {}
 try { db.exec("ALTER TABLE tasks ADD COLUMN assetPath TEXT DEFAULT ''"); } catch (e) {}
 
+try { db.exec("ALTER TABLE tasks ADD COLUMN scheduledDate TEXT"); } catch (e) {}
+
+
+// Migration: Assign today's date to any old scheduled tasks missing a scheduledDate
+const todayStr = new Date().toISOString().split('T')[0];
+// Migration: If scheduledDate is empty, set it to the task's deadline date
+try { 
+  db.exec(`
+    UPDATE tasks 
+    SET scheduledDate = deadline 
+    WHERE status = 'Scheduled' 
+      AND (scheduledDate IS NULL OR scheduledDate = '' OR scheduledDate = '${new Date().toISOString().split('T')[0]}') 
+      AND deadline != 'NO DEADLINE'
+  `); 
+} catch (e) {}
+
 // Seed Initial Subjects (If empty)
 const countResult = db.prepare("SELECT COUNT(*) AS count FROM subjects").get();
 

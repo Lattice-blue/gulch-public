@@ -19,6 +19,10 @@
       "dest": "server/index.js"
     },
     {
+      "src": "/globe-assets/(.*)",
+      "dest": "client/dist/globe-assets/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "client/$1"
     }
